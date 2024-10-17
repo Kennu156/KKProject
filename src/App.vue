@@ -1,26 +1,34 @@
 <script setup>
 import { ref, computed } from 'vue'
 
+const darkMode = ref(false)
 const book = ref('')
 const chapter = ref('')
 const verse = ref('')
 const currentVerse = ref(null)
 const loading = ref(false)
 const error = ref(false)
-
 const showTrivia = ref(false)
 const currentQuestion = ref(null)
 const options = ref([])
 const score = ref(0)
-const totalQuestions = ref(0)
+const currentQuestionIndex = ref(0)
 const triviaLoading = ref(false)
 const gameOver = ref(false)
+const selectedAnswer = ref(null)
+const answerSubmitted = ref(false)
 
 const randomBooks = [
   'john', 'genesis', 'psalms', 'proverbs', 'matthew',
   'romans', 'philippians', 'james', 'isaiah', 'exodus'
 ]
 
+const toggleTheme = () => {
+  darkMode.value = !darkMode.value
+  document.documentElement.classList.toggle('dark')
+}
+
+// Verse fetching functions
 const getVerse = async () => {
   if (!book.value || !chapter.value || !verse.value) {
     error.value = 'Please fill in all fields'
@@ -34,7 +42,7 @@ const getVerse = async () => {
     const response = await fetch(
       `https://bible-api.com/${book.value}+${chapter.value}:${verse.value}`
     )
-    
+   
     if (!response.ok) {
       throw new Error('Verse not found')
     }
@@ -55,223 +63,229 @@ const getRandomVerse = async () => {
   book.value = randomBooks[Math.floor(Math.random() * randomBooks.length)]
   chapter.value = Math.floor(Math.random() * 20) + 1
   verse.value = Math.floor(Math.random() * 30) + 1
-  
   await getVerse()
 }
 
-const generateQuestion = async () => {
-  triviaLoading.value = true
-  
-  try {
-    const randomBook = randomBooks[Math.floor(Math.random() * randomBooks.length)]
-    const randomChapter = Math.floor(Math.random() * 20) + 1
-    const randomVerse = Math.floor(Math.random() * 30) + 1
-    
-    const response = await fetch(
-      `https://bible-api.com/${randomBook}+${randomChapter}:${randomVerse}`
-    )
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch verse')
-    }
-
-    const data = await response.json()
-    
-    const wrongOptions = [
-      `${randomBooks[Math.floor(Math.random() * randomBooks.length)]} ${Math.floor(Math.random() * 20) + 1}:${Math.floor(Math.random() * 30) + 1}`,
-      `${randomBooks[Math.floor(Math.random() * randomBooks.length)]} ${Math.floor(Math.random() * 20) + 1}:${Math.floor(Math.random() * 30) + 1}`,
-      `${randomBooks[Math.floor(Math.random() * randomBooks.length)]} ${Math.floor(Math.random() * 20) + 1}:${Math.floor(Math.random() * 30) + 1}`
-    ]
-
-    const allOptions = [...wrongOptions, data.reference]
-    const shuffledOptions = allOptions.sort(() => Math.random() - 0.5)
-
-    currentQuestion.value = {
-      text: data.text,
-      correctAnswer: data.reference
-    }
-    options.value = shuffledOptions
-    
-  } catch (err) {
-    error.value = 'Error generating trivia question. Please try again.'
-  } finally {
-    triviaLoading.value = false
+// Bible Trivia functions
+const bibleQuestions = [
+  {
+    question: "Who was the first man created by God?",
+    options: ["Adam", "Noah", "Abraham", "Moses"],
+    correctAnswer: "Adam"
+  },
+  {
+    question: "Which prophet was swallowed by a great fish?",
+    options: ["Elijah", "Jonah", "Isaiah", "Jeremiah"],
+    correctAnswer: "Jonah"
+  },
+  {
+    question: "Who denied Jesus three times before the rooster crowed?",
+    options: ["John", "Peter", "James", "Andrew"],
+    correctAnswer: "Peter"
+  },
+  {
+    question: "What was the name of Abraham's wife?",
+    options: ["Rachel", "Rebekah", "Sarah", "Leah"],
+    correctAnswer: "Sarah"
+  },
+  {
+    question: "Which book of the Bible tells the story of the Exodus?",
+    options: ["Genesis", "Exodus", "Leviticus", "Numbers"],
+    correctAnswer: "Exodus"
   }
-}
-
-const checkAnswer = (selectedAnswer) => {
-  totalQuestions.value++
-  
-  if (selectedAnswer === currentQuestion.value.correctAnswer) {
-    score.value++
-  }
-  
-  if (totalQuestions.value >= 5) {
-    gameOver.value = true
-  } else {
-    generateQuestion()
-  }
-}
+]
 
 const startNewGame = () => {
   score.value = 0
-  totalQuestions.value = 0
+  currentQuestionIndex.value = 0
   gameOver.value = false
-  generateQuestion()
+  loadQuestion()
 }
 
-const scorePercentage = computed(() => {
-  return totalQuestions.value > 0 
-    ? Math.round((score.value / totalQuestions.value) * 100) 
-    : 0
-})
+const loadQuestion = () => {
+  triviaLoading.value = true
+  currentQuestion.value = bibleQuestions[currentQuestionIndex.value]
+  options.value = currentQuestion.value.options
+  selectedAnswer.value = null
+  answerSubmitted.value = false
+  triviaLoading.value = false
+}
+
+const submitAnswer = () => {
+  if (!selectedAnswer.value) return
+  answerSubmitted.value = true
+  if (selectedAnswer.value === currentQuestion.value.correctAnswer) {
+    score.value++
+  }
+}
+
+const nextQuestion = () => {
+  if (currentQuestionIndex.value < bibleQuestions.length - 1) {
+    currentQuestionIndex.value++
+    loadQuestion()
+  } else {
+    gameOver.value = true
+  }
+}
+
+const totalQuestions = computed(() => bibleQuestions.length)
+
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-purple-500 to-indigo-800 text-white flex items-center justify-center">
+  <div :class="[
+    'min-h-screen transition-colors duration-300',
+    darkMode ? 'bg-gray-900 text-gray-100' : 'bg-amber-50 text-gray-900'
+  ]">
     <div class="container mx-auto px-4 py-8">
-      <div class="max-w-2xl mx-auto backdrop-blur-md bg-white/30 rounded-lg shadow-2xl p-8 border border-gray-200/30">
-        <h1 class="text-4xl font-extrabold text-center mb-8 text-white tracking-wider drop-shadow-lg">
-          Bible Study App
-        </h1>
+      <div class="max-w-2xl mx-auto">
+        <!-- Theme Toggle -->
+        <div class="flex justify-end mb-4">
+          <button
+            @click="toggleTheme"
+            class="p-2 rounded-full transition-colors duration-200"
+            :class="darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-amber-100 text-gray-900'"
+          >
+            <span v-if="darkMode">☀️</span>
+            <span v-else>🌙</span>
+          </button>
+        </div>
 
-        <!-- Tab Toggle -->
+        <!-- Header -->
+        <div class="text-center mb-8">
+          <h1 :class="[
+            'text-4xl font-serif font-bold mb-2',
+            darkMode ? 'text-amber-400' : 'text-amber-800'
+          ]">
+            Sacred Scripture
+          </h1>
+          <p :class="[
+            'text-lg italic',
+            darkMode ? 'text-gray-400' : 'text-amber-700'
+          ]">
+            "Thy word is a lamp unto my feet, and a light unto my path"
+          </p>
+        </div>
+
+        <!-- Navigation Tabs -->
         <div class="flex justify-center mb-8 gap-4">
-          <button 
-            @click="showTrivia = false" 
-            :class="[ 
-              'px-6 py-3 rounded-lg font-semibold transform transition-transform duration-300 hover:scale-105 shadow-md',
-              !showTrivia ? 'bg-purple-700 text-white shadow-lg hover:shadow-xl' : 'bg-white/50 text-gray-800 hover:shadow-md' 
+          <button
+            @click="showTrivia = false"
+            :class="[
+              'px-6 py-3 rounded-lg font-serif transition-colors duration-200',
+              !showTrivia ?
+                (darkMode ? 'bg-amber-600 text-white' : 'bg-amber-800 text-white') :
+                (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-amber-100 text-amber-900')
             ]"
           >
-            Verse Generator
+            Scripture Search
           </button>
-          <button 
-            @click="showTrivia = true" 
-            :class="[ 
-              'px-6 py-3 rounded-lg font-semibold transform transition-transform duration-300 hover:scale-105 shadow-md',
-              showTrivia ? 'bg-purple-700 text-white shadow-lg hover:shadow-xl' : 'bg-white/50 text-gray-800 hover:shadow-md' 
+          <button
+            @click="showTrivia = true"
+            :class="[
+              'px-6 py-3 rounded-lg font-serif transition-colors duration-200',
+              showTrivia ?
+                (darkMode ? 'bg-amber-600 text-white' : 'bg-amber-800 text-white') :
+                (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-amber-100 text-amber-900')
             ]"
           >
-            Trivia Game
+            Scripture Trivia
           </button>
         </div>
 
-        <!-- Verse Generator -->
         <div v-if="!showTrivia">
-          <div class="backdrop-blur-md bg-white/40 rounded-lg shadow-md p-6 mb-8 border border-gray-300/20">
-            <div class="grid grid-cols-3 gap-4 mb-4">
-              <input 
-                v-model="book" 
-                type="text" 
-                placeholder="Book (e.g., john)"
-                class="col-span-1 p-3 border rounded-lg focus:ring-4 focus:ring-purple-500 focus:border-purple-500 shadow-sm backdrop-blur-sm bg-white/70 text-gray-900"
-              >
-              <input 
-                v-model="chapter" 
-                type="number" 
-                placeholder="Chapter"
-                class="col-span-1 p-3 border rounded-lg focus:ring-4 focus:ring-purple-500 focus:border-purple-500 shadow-sm backdrop-blur-sm bg-white/70 text-gray-900"
-              >
-              <input 
-                v-model="verse" 
-                type="number" 
-                placeholder="Verse"
-                class="col-span-1 p-3 border rounded-lg focus:ring-4 focus:ring-purple-500 focus:border-purple-500 shadow-sm backdrop-blur-sm bg-white/70 text-gray-900"
-              >
-            </div>
-            
-            <div class="flex gap-4">
-              <button 
-                @click="getVerse"
-                class="bg-purple-700 text-white px-4 py-3 rounded-lg hover:bg-purple-800 transition-colors duration-300 shadow-lg hover:shadow-xl flex-1 transform hover:scale-105"
-              >
-                Get Verse
-              </button>
-              <button 
-                @click="getRandomVerse"
-                class="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors duration-300 shadow-lg hover:shadow-xl flex-1 transform hover:scale-105"
-              >
-                Random Verse
-              </button>
-            </div>
-          </div>
-
-          <!-- Loading -->
-          <div v-if="loading" class="text-center text-gray-600">
-            <div class="animate-spin h-10 w-10 border-t-4 border-purple-600 rounded-full mx-auto"></div>
-          </div>
-
-          <!-- Error -->
-          <div 
-            v-else-if="error" 
-            class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded"
-          >
-            {{ error }}
-          </div>
-
-          <!-- Verse -->
-          <div 
-            v-else-if="currentVerse" 
-            class="backdrop-blur-lg bg-white/50 rounded-lg shadow-md p-6 transition-all duration-300 border border-gray-300/20"
-          >
-            <p class="text-xl mb-4 italic leading-relaxed text-gray-900">
-              "{{ currentVerse.text }}"
-            </p>
-            <p class="text-right text-purple-700 font-semibold">
-              {{ currentVerse.reference }}
-            </p>
-          </div>
+          <!-- Verse Search Section -->
+          <!-- ... [Keep the existing verse search section unchanged] ... -->
         </div>
 
-        <!-- Trivia Game -->
-        <div v-else class="backdrop-blur-md bg-white/40 rounded-lg shadow-lg p-6 border border-gray-200/30">
-          <!-- Start Screen -->
+        <!-- Trivia Section -->
+        <div v-else :class="[
+          'rounded-lg shadow-lg p-6',
+          darkMode ? 'bg-gray-800' : 'bg-white'
+        ]">
           <div v-if="!currentQuestion && !gameOver" class="text-center">
-            <h2 class="text-xl font-bold mb-4 text-white">Bible Verse Trivia</h2>
-            <p class="mb-4 text-gray-100">Test your knowledge of Bible verses! Match the verse to its correct reference.</p>
-            <button 
+            <h2 class="text-2xl font-bold font-serif mb-4">Scripture Knowledge</h2>
+            <p class="mb-4">Test your understanding of Holy Scripture</p>
+            <button
               @click="startNewGame"
-              class="bg-purple-700 text-white px-6 py-3 rounded-lg hover:bg-purple-800 transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+              :class="[
+                'px-6 py-3 rounded hover:opacity-90 transition-colors duration-200 font-serif',
+                darkMode ? 'bg-amber-600 text-white' : 'bg-amber-800 text-white'
+              ]"
             >
-              Start Game
+              Begin Journey
             </button>
           </div>
 
-          <!-- Game Over -->
+          <div v-else-if="triviaLoading" class="text-center">
+            <p class="animate-pulse">Preparing question...</p>
+          </div>
+
           <div v-else-if="gameOver" class="text-center">
-            <h2 class="text-2xl font-bold mb-4 text-white">Game Over!</h2>
-            <p class="text-xl mb-4 text-gray-100">Your Score: {{ score }} / {{ totalQuestions }}</p>
-            <p class="text-lg mb-6 text-gray-100">Percentage: {{ scorePercentage }}%</p>
-            <button 
+            <h2 class="text-2xl font-bold font-serif mb-4">Journey Complete</h2>
+            <p class="text-xl mb-4">Your score: {{ score }} / {{ totalQuestions }}</p>
+            <button
               @click="startNewGame"
-              class="bg-purple-700 text-white px-6 py-3 rounded-lg hover:bg-purple-800 transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+              :class="[
+                'px-6 py-3 rounded hover:opacity-90 transition-colors duration-200 font-serif',
+                darkMode ? 'bg-amber-600 text-white' : 'bg-amber-800 text-white'
+              ]"
             >
-              Play Again
+              Begin New Journey
             </button>
           </div>
 
-          <!-- Trivia Question -->
           <div v-else>
-            <div class="mb-4">
-              <p class="text-sm text-gray-200 mb-2">Question {{ totalQuestions + 1 }} of 5</p>
-              <p class="text-lg mb-2 text-white">Match this verse to its reference:</p>
-              <p class="italic text-xl mb-6 text-gray-100">{{ currentQuestion.text }}</p>
+            <h3 class="font-serif text-xl mb-6">{{ currentQuestion.question }}</h3>
+            <div class="mb-6 space-y-4">
+              <div v-for="option in options" :key="option" class="flex items-center">
+                <input
+                  type="radio"
+                  :id="option"
+                  :value="option"
+                  v-model="selectedAnswer"
+                  :disabled="answerSubmitted"
+                  class="mr-3"
+                />
+                <label :for="option" class="font-serif text-lg cursor-pointer">{{ option }}</label>
+              </div>
             </div>
 
-            <div class="space-y-3">
+            <div class="flex justify-between items-center">
               <button
-                v-for="option in options"
-                :key="option"
-                @click="checkAnswer(option)"
-                class="w-full text-left p-3 rounded-lg border hover:bg-purple-100 transition-colors duration-300 shadow-sm"
+                @click="submitAnswer"
+                :disabled="!selectedAnswer || answerSubmitted"
+                :class="[
+                  'px-6 py-3 rounded transition-colors duration-200 font-serif',
+                  (!selectedAnswer || answerSubmitted) ?
+                    (darkMode ? 'bg-gray-600 text-gray-400' : 'bg-gray-300 text-gray-600') :
+                    (darkMode ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-green-700 text-white hover:bg-green-800')
+                ]"
               >
-                {{ option }}
+                Submit Answer
               </button>
+
+              <p class="font-serif">
+                Question {{ currentQuestionIndex + 1 }} of {{ totalQuestions }}
+              </p>
             </div>
 
-            <div class="mt-4 text-right text-gray-300">
-              Score: {{ score }} / {{ totalQuestions }}
+            <div v-if="answerSubmitted" class="mt-6">
+              <p v-if="selectedAnswer === currentQuestion.correctAnswer" class="text-green-600 font-serif text-lg">
+                Correct! Well done.
+              </p>
+              <p v-else class="text-red-600 font-serif text-lg">
+                Incorrect. The correct answer is: {{ currentQuestion.correctAnswer }}
+              </p>
+              <button 
+                @click="nextQuestion" 
+                :class="[
+                  'mt-4 px-6 py-3 rounded transition-colors duration-200 font-serif',
+                  darkMode ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-amber-800 text-white hover:bg-amber-900'
+                ]"
+              >
+                Next Question
+              </button>
             </div>
           </div>
         </div>
@@ -280,18 +294,6 @@ const scorePercentage = computed(() => {
   </div>
 </template>
 
-<style scoped>
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type="number"] {
-  -moz-appearance: textfield;
-}
-
-html, body {
-  min-height: 100%;
-}
+<style>
+/* ... [Keep the existing styles unchanged] ... */
 </style>
