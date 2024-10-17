@@ -15,6 +15,8 @@ const score = ref(0)
 const totalQuestions = ref(0)
 const triviaLoading = ref(false)
 const gameOver = ref(false)
+const selectedAnswer = ref(null)
+const answerSubmitted = ref(false)
 
 const randomBooks = [
   'john', 'genesis', 'psalms', 'proverbs', 'matthew',
@@ -61,6 +63,8 @@ const getRandomVerse = async () => {
 
 const generateQuestion = async () => {
   triviaLoading.value = true
+  selectedAnswer.value = null
+  answerSubmitted.value = false
   
   try {
     const randomBook = randomBooks[Math.floor(Math.random() * randomBooks.length)]
@@ -99,24 +103,32 @@ const generateQuestion = async () => {
   }
 }
 
-const checkAnswer = (selectedAnswer) => {
-  totalQuestions.value++
+const checkAnswer = (answer) => {
+  if (answerSubmitted.value) return
   
-  if (selectedAnswer === currentQuestion.value.correctAnswer) {
+  selectedAnswer.value = answer
+  answerSubmitted.value = true
+  
+  if (answer === currentQuestion.value.correctAnswer) {
     score.value++
   }
   
-  if (totalQuestions.value >= 5) {
-    gameOver.value = true
-  } else {
-    generateQuestion()
-  }
+  setTimeout(() => {
+    if (totalQuestions.value >= 4) {
+      gameOver.value = true
+    } else {
+      totalQuestions.value++
+      generateQuestion()
+    }
+  }, 1500)
 }
 
 const startNewGame = () => {
   score.value = 0
   totalQuestions.value = 0
   gameOver.value = false
+  selectedAnswer.value = null
+  answerSubmitted.value = false
   generateQuestion()
 }
 
@@ -125,6 +137,23 @@ const scorePercentage = computed(() => {
     ? Math.round((score.value / totalQuestions.value) * 100) 
     : 0
 })
+
+const getOptionClass = (option) => {
+  if (!answerSubmitted.value) {
+    return 'hover:bg-indigo-50'
+  }
+  
+  if (option === currentQuestion.value.correctAnswer) {
+    return 'bg-green-100 border-green-500'
+  }
+  
+  if (option === selectedAnswer.value && option !== currentQuestion.value.correctAnswer) {
+    return 'bg-red-100 border-red-500'
+  }
+  
+  return ''
+}
+
 </script>
 
 <template>
@@ -233,7 +262,7 @@ const scorePercentage = computed(() => {
 
           <div v-else-if="gameOver" class="text-center">
             <h2 class="text-2xl font-bold mb-4">Game Over!</h2>
-            <p class="text-xl mb-4">Your Score: {{ score }} / {{ totalQuestions }}</p>
+            <p class="text-xl mb-4">Your Score: {{ score }} / {{ totalQuestions + 1 }}</p>
             <p class="text-lg mb-6">Percentage: {{ scorePercentage }}%</p>
             <button 
               @click="startNewGame"
@@ -255,14 +284,18 @@ const scorePercentage = computed(() => {
                 v-for="option in options"
                 :key="option"
                 @click="checkAnswer(option)"
-                class="w-full text-left p-3 rounded border hover:bg-indigo-50 transition-colors duration-200"
+                :disabled="answerSubmitted"
+                :class="[
+                  'w-full text-left p-3 rounded border transition-colors duration-200',
+                  getOptionClass(option)
+                ]"
               >
                 {{ option }}
               </button>
             </div>
 
             <div class="mt-4 text-right text-gray-600">
-              Score: {{ score }} / {{ totalQuestions }}
+              Score: {{ score }} / {{ totalQuestions + 1 }}
             </div>
           </div>
         </div>
